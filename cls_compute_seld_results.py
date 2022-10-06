@@ -61,7 +61,7 @@ class ComputeSELDResults(object):
             for ref_file in os.listdir(os.path.join(self._desc_dir, split)):
                 # Load reference description file
                 if params['depth_coup_loss']:
-                    gt_dict = self._feat_cls.load_output_format_file_depthC(os.path.join(self._desc_dir, split, ref_file))
+                    gt_dict = self._feat_cls.load_output_format_file_ignoreDepth(os.path.join(self._desc_dir, split, ref_file))
                 else:
                     gt_dict = self._feat_cls.load_output_format_file(os.path.join(self._desc_dir, split, ref_file))
                 if not self._use_polar_format:
@@ -107,7 +107,10 @@ class ComputeSELDResults(object):
         eval = SELD_evaluation_metrics.SELDMetrics(nb_classes=self._feat_cls.get_nb_classes(), doa_threshold=self._doa_thresh, average=self._average)
         for pred_cnt, pred_file in enumerate(pred_files):
             # Load predicted output format file
-            pred_dict = self._feat_cls.load_output_format_file(os.path.join(pred_files_path, pred_file))
+            if self._feat_cls._depth_coup_loss:
+                pred_dict = self._feat_cls.load_output_format_file_ignoreDepth(os.path.join(pred_files_path, pred_file))
+            else:
+                pred_dict = self._feat_cls.load_output_format_file(os.path.join(pred_files_path, pred_file))
             if self._use_polar_format:
                 pred_dict = self._feat_cls.convert_output_format_cartesian_to_polar(pred_dict)
             pred_labels = self._feat_cls.segment_labels(pred_dict, self._ref_labels[pred_file][1])

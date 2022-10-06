@@ -31,6 +31,7 @@ class FeatureClass:
         # Input directories
         self._feat_label_dir = params['feat_label_dir']
         self._dataset_dir = params['dataset_dir']
+        self._depth_coup_loss = params['depth_coup_loss']
         self._dataset_combination = '{}_{}'.format(params['dataset'], 'eval' if is_eval else 'dev')
         self._aud_dir = os.path.join(self._dataset_dir, self._dataset_combination)
 
@@ -496,6 +497,26 @@ class FeatureClass:
         _fid.close()
         return _output_dict
 
+    def load_output_format_file_ignoreDepth(self, _output_format_file):
+        """
+        Loads DCASE output format csv file and returns it in dictionary format
+
+        :param _output_format_file: DCASE output format CSV
+        :return: _output_dict: dictionary
+        """
+        _output_dict = {}
+        _fid = open(_output_format_file, 'r')
+        # next(_fid)
+        for _line in _fid:
+            _words = _line.strip().split(',')
+            _frame_ind = int(_words[0])
+            if _frame_ind not in _output_dict:
+                _output_dict[_frame_ind] = []
+
+            _output_dict[_frame_ind].append([int(_words[1]), int(_words[2]), float(_words[3]), float(_words[4])])
+        _fid.close()
+        return _output_dict
+
     def load_output_format_file_depthC(self, _output_format_file):
         """
         Loads DCASE output format csv file and returns it in dictionary format
@@ -530,6 +551,21 @@ class FeatureClass:
             for _value in _output_format_dict[_frame_ind]:
                 # Write Cartesian format output. Since baseline does not estimate track count we use a fixed value.
                 _fid.write('{},{},{},{},{},{}\n'.format(int(_frame_ind), int(_value[0]), 0, float(_value[1]), float(_value[2]), float(_value[3])))
+        _fid.close()
+
+    def write_output_format_file_depthC(self, _output_format_file, _output_format_dict):
+        """
+        Writes DCASE output format csv file, given output format dictionary
+        :param _output_format_file:
+        :param _output_format_dict:
+        :return:
+        """
+        _fid = open(_output_format_file, 'w')
+        # _fid.write('{},{},{},{}\n'.format('frame number with 20ms hop (int)', 'class index (int)', 'azimuth angle (int)', 'elevation angle (int)'))
+        for _frame_ind in _output_format_dict.keys():
+            for _value in _output_format_dict[_frame_ind]:
+                # Write Cartesian format output. Since baseline does not estimate track count we use a fixed value.
+                _fid.write('{},{},{},{},{},{},{}\n'.format(int(_frame_ind), int(_value[0]), 0, float(_value[1]), float(_value[2]), float(_value[3]), float(_value[4])))
         _fid.close()
 
     def segment_labels(self, _pred_dict, _max_frames):

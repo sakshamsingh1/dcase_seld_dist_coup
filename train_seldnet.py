@@ -67,7 +67,7 @@ def get_multi_accdoa_labels_depthC(accdoa_in, nb_classes):
         elev = np.arctan2(z_in, np.sqrt(x_in ** 2 + y_in ** 2)) * 180 / np.pi
         return az, elev, r
 
-    def polar_to_unit_cart(az, elev, r):
+    def polar_to_unit_cart(az, elev):
         ele_rad = elev * np.pi / 180.
         azi_rad = az * np.pi / 180
 
@@ -84,21 +84,21 @@ def get_multi_accdoa_labels_depthC(accdoa_in, nb_classes):
     # 3. doa0 will be the cartesian values in the unit sphere
     # 4. depth0 will be r0
     az0, el0, r0 = cart_to_polar_and_dep(x0, y0, z0)
-    x0_unit, y0_unit, z0_unit = polar_to_unit_cart(az0, el0, r0)
+    x0_unit, y0_unit, z0_unit = polar_to_unit_cart(az0, el0)
     doa0 = np.concatenate((x0_unit, y0_unit, z0_unit), axis=2)
     # doa0 = accdoa_in[:, :, :3*nb_classes]
 
     x1, y1, z1 = accdoa_in[:, :, 3*nb_classes:4*nb_classes], accdoa_in[:, :, 4*nb_classes:5*nb_classes], accdoa_in[:, :, 5*nb_classes:6*nb_classes]
     sed1 = np.sqrt(x1**2 + y1**2 + z1**2) > 0.5
     az1, el1, r1 = cart_to_polar_and_dep(x1, y1, z1)
-    x1_unit, y1_unit, z1_unit = polar_to_unit_cart(az1, el1, r1)
+    x1_unit, y1_unit, z1_unit = polar_to_unit_cart(az1, el1)
     doa1 = np.concatenate((x1_unit, y1_unit, z1_unit), axis=2)
     # doa1 = accdoa_in[:, :, 3*nb_classes: 6*nb_classes]
 
     x2, y2, z2 = accdoa_in[:, :, 6*nb_classes:7*nb_classes], accdoa_in[:, :, 7*nb_classes:8*nb_classes], accdoa_in[:, :, 8*nb_classes:]
     sed2 = np.sqrt(x2**2 + y2**2 + z2**2) > 0.5
     az2, el2, r2 = cart_to_polar_and_dep(x2, y2, z2)
-    x2_unit, y2_unit, z2_unit = polar_to_unit_cart(az2, el2, r2)
+    x2_unit, y2_unit, z2_unit = polar_to_unit_cart(az2, el2)
     doa2 = np.concatenate((x2_unit, y2_unit, z2_unit), axis=2)
     # doa2 = accdoa_in[:, :, 6*nb_classes:]
 
@@ -259,7 +259,10 @@ def test_epoch(data_generator, model, criterion, dcase_output_folder, params, de
                             if frame_cnt not in output_dict:
                                 output_dict[frame_cnt] = []
                             output_dict[frame_cnt].append([class_cnt, doa_pred[frame_cnt][class_cnt], doa_pred[frame_cnt][class_cnt+params['unique_classes']], doa_pred[frame_cnt][class_cnt+2*params['unique_classes']]]) 
-            data_generator.write_output_format_file(output_file, output_dict)
+            if params['']:
+                data_generator.write_output_format_file_depthC(output_file, output_dict)
+            else:
+                data_generator.write_output_format_file(output_file, output_dict)
 
             test_loss += loss.item()
             nb_test_batches += 1
