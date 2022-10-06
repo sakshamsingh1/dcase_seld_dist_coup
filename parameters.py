@@ -159,8 +159,7 @@ def get_params(argv='1'):
         params['use_salsalite'] = False
         params['multi_accdoa'] = True
         params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
-        params[
-            'feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
+        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
 
     elif argv == '13':
         print("MIC + GCC + synth_data generated + ignore distance + multi ACCDOA + \n")
@@ -178,8 +177,7 @@ def get_params(argv='1'):
         params['use_salsalite'] = False
         params['multi_accdoa'] = True
         params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
-        params[
-            'feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
+        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
 
     elif argv == '15':
         print("MIC + GCC + synth_data gen + multi ACCDOA\n")
@@ -208,8 +206,7 @@ def get_params(argv='1'):
         params['use_salsalite'] = False
         params['multi_accdoa'] = True
         params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
-        params[
-            'feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_genComb_distFloat_distLoss_2022_new'
+        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_genComb_distFloat_distLoss_2022_new'
         params['train_synth_test_synth'] = True
         params['depth_coup_loss'] = True
 
