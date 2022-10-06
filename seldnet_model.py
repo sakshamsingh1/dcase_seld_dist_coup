@@ -215,6 +215,7 @@ class CRNN(torch.nn.Module):
     def __init__(self, in_feat_shape, out_shape, params):
         super().__init__()
         self.nb_classes = params['unique_classes']
+        self.depth_coup_loss = params['depth_coup_loss']
         self.conv_block_list = torch.nn.ModuleList()
         if len(params['f_pool_size']):
             for conv_cnt in range(len(params['f_pool_size'])):
@@ -274,7 +275,9 @@ class CRNN(torch.nn.Module):
         x_rnn = x
         for fnn_cnt in range(len(self.fnn_list)-1):
             x = self.fnn_list[fnn_cnt](x)
-        doa = torch.tanh(self.fnn_list[-1](x))
-        '''(batch_size, time_steps, label_dim)'''
-
-        return doa
+        if self.depth_coup_loss:
+            return self.fnn_list[-1](x)
+        else:
+            doa = torch.tanh(self.fnn_list[-1](x))
+            '''(batch_size, time_steps, label_dim)'''
+            return doa

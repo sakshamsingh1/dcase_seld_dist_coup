@@ -51,6 +51,60 @@ def get_multi_accdoa_labels(accdoa_in, nb_classes):
 
     return sed0, doa0, sed1, doa1, sed2, doa2
 
+def get_multi_accdoa_labels_depthC(accdoa_in, nb_classes):
+    """
+    Args:
+        accdoa_in:  [batch_size, frames, num_track*num_axis*num_class=3*3*12]
+        nb_classes: scalar
+    Return:
+        sedX:       [batch_size, frames, num_class=12]
+        doaX:       [batch_size, frames, num_axis*num_class=3*12]
+    """
+
+    def cart_to_polar_and_dep(x_in, y_in, z_in):
+        r = np.sqrt(x_in**2 + y_in**2 + z_in**2)
+        az = np.arctan2(y_in, x_in) * 180 / np.pi
+        elev = np.arctan2(z_in, np.sqrt(x_in ** 2 + y_in ** 2)) * 180 / np.pi
+        return az, elev, r
+
+    def polar_to_unit_cart(az, elev, r):
+        ele_rad = elev * np.pi / 180.
+        azi_rad = az * np.pi / 180
+
+        tmp_label = np.cos(ele_rad)
+        x = np.cos(azi_rad) * tmp_label
+        y = np.sin(azi_rad) * tmp_label
+        z = np.sin(ele_rad)
+        return x, y, z
+
+    x0, y0, z0 = accdoa_in[:, :, :1*nb_classes], accdoa_in[:, :, 1*nb_classes:2*nb_classes], accdoa_in[:, :, 2*nb_classes:3*nb_classes]
+    sed0 = np.sqrt(x0**2 + y0**2 + z0**2) > 0.5
+    # 1. convert x0, y0, z0 to az0, el0, and r0 (polar)
+    # 2. use az0 and el0 to calcualte cartesian in the unit sphere (x0_unit, y0_unit, z0_unit)
+    # 3. doa0 will be the cartesian values in the unit sphere
+    # 4. depth0 will be r0
+    az0, el0, r0 = cart_to_polar_and_dep(x0, y0, z0)
+    x0_unit, y0_unit, z0_unit = polar_to_unit_cart(az0, el0, r0)
+    doa0 = np.concatenate((x0_unit, y0_unit, z0_unit), axis=2)
+    # doa0 = accdoa_in[:, :, :3*nb_classes]
+
+    x1, y1, z1 = accdoa_in[:, :, 3*nb_classes:4*nb_classes], accdoa_in[:, :, 4*nb_classes:5*nb_classes], accdoa_in[:, :, 5*nb_classes:6*nb_classes]
+    sed1 = np.sqrt(x1**2 + y1**2 + z1**2) > 0.5
+    az1, el1, r1 = cart_to_polar_and_dep(x1, y1, z1)
+    x1_unit, y1_unit, z1_unit = polar_to_unit_cart(az1, el1, r1)
+    doa1 = np.concatenate((x1_unit, y1_unit, z1_unit), axis=2)
+    # doa1 = accdoa_in[:, :, 3*nb_classes: 6*nb_classes]
+
+    x2, y2, z2 = accdoa_in[:, :, 6*nb_classes:7*nb_classes], accdoa_in[:, :, 7*nb_classes:8*nb_classes], accdoa_in[:, :, 8*nb_classes:]
+    sed2 = np.sqrt(x2**2 + y2**2 + z2**2) > 0.5
+    az2, el2, r2 = cart_to_polar_and_dep(x2, y2, z2)
+    x2_unit, y2_unit, z2_unit = polar_to_unit_cart(az2, el2, r2)
+    doa2 = np.concatenate((x2_unit, y2_unit, z2_unit), axis=2)
+    # doa2 = accdoa_in[:, :, 6*nb_classes:]
+
+    return sed0, doa0, sed1, doa1, sed2, doa2, r0, r1, r2
+
+
 
 def determine_similar_location(sed_pred0, sed_pred1, doa_pred0, doa_pred1, class_cnt, thresh_unify, nb_classes):
     if (sed_pred0 == 1) and (sed_pred1 == 1):
@@ -80,13 +134,20 @@ def test_epoch(data_generator, model, criterion, dcase_output_folder, params, de
             output = model(data)
             loss = criterion(output, target)
             if params['multi_accdoa'] is True:
-                sed_pred0, doa_pred0, sed_pred1, doa_pred1, sed_pred2, doa_pred2 = get_multi_accdoa_labels(output.detach().cpu().numpy(), params['unique_classes'])
+                if params['depth_coup_loss']:
+                    sed_pred0, doa_pred0, sed_pred1, doa_pred1, sed_pred2, doa_pred2, depth0, depth1, depth2 = get_multi_accdoa_labels_depthC(output.detach().cpu().numpy(), params['unique_classes'])
+                else:
+                    sed_pred0, doa_pred0, sed_pred1, doa_pred1, sed_pred2, doa_pred2 = get_multi_accdoa_labels(output.detach().cpu().numpy(), params['unique_classes'])
                 sed_pred0 = reshape_3Dto2D(sed_pred0)
                 doa_pred0 = reshape_3Dto2D(doa_pred0)
                 sed_pred1 = reshape_3Dto2D(sed_pred1)
                 doa_pred1 = reshape_3Dto2D(doa_pred1)
                 sed_pred2 = reshape_3Dto2D(sed_pred2)
                 doa_pred2 = reshape_3Dto2D(doa_pred2)
+                if params['depth_coup_loss']:
+                    depth0 = reshape_3Dto2D(depth0)
+                    depth1 = reshape_3Dto2D(depth1)
+                    depth2 = reshape_3Dto2D(depth2)
             else:
                 sed_pred, doa_pred = get_accdoa_labels(output.detach().cpu().numpy(), params['unique_classes'])
                 sed_pred = reshape_3Dto2D(sed_pred)
@@ -97,49 +158,100 @@ def test_epoch(data_generator, model, criterion, dcase_output_folder, params, de
             file_cnt += 1
             output_dict = {}
             if params['multi_accdoa'] is True:
-                for frame_cnt in range(sed_pred0.shape[0]):
-                    for class_cnt in range(sed_pred0.shape[1]):
-                        # determine whether track0 is similar to track1
-                        flag_0sim1 = determine_similar_location(sed_pred0[frame_cnt][class_cnt], sed_pred1[frame_cnt][class_cnt], doa_pred0[frame_cnt], doa_pred1[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
-                        flag_1sim2 = determine_similar_location(sed_pred1[frame_cnt][class_cnt], sed_pred2[frame_cnt][class_cnt], doa_pred1[frame_cnt], doa_pred2[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
-                        flag_2sim0 = determine_similar_location(sed_pred2[frame_cnt][class_cnt], sed_pred0[frame_cnt][class_cnt], doa_pred2[frame_cnt], doa_pred0[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
-                        # unify or not unify according to flag
-                        if flag_0sim1 + flag_1sim2 + flag_2sim0 == 0:
-                            if sed_pred0[frame_cnt][class_cnt]>0.5:
-                                if frame_cnt not in output_dict:
-                                    output_dict[frame_cnt] = []
-                                output_dict[frame_cnt].append([class_cnt, doa_pred0[frame_cnt][class_cnt], doa_pred0[frame_cnt][class_cnt+params['unique_classes']], doa_pred0[frame_cnt][class_cnt+2*params['unique_classes']]])
-                            if sed_pred1[frame_cnt][class_cnt]>0.5:
-                                if frame_cnt not in output_dict:
-                                    output_dict[frame_cnt] = []
-                                output_dict[frame_cnt].append([class_cnt, doa_pred1[frame_cnt][class_cnt], doa_pred1[frame_cnt][class_cnt+params['unique_classes']], doa_pred1[frame_cnt][class_cnt+2*params['unique_classes']]])
-                            if sed_pred2[frame_cnt][class_cnt]>0.5:
-                                if frame_cnt not in output_dict:
-                                    output_dict[frame_cnt] = []
-                                output_dict[frame_cnt].append([class_cnt, doa_pred2[frame_cnt][class_cnt], doa_pred2[frame_cnt][class_cnt+params['unique_classes']], doa_pred2[frame_cnt][class_cnt+2*params['unique_classes']]])
-                        elif flag_0sim1 + flag_1sim2 + flag_2sim0 == 1:
-                            if frame_cnt not in output_dict:
-                                output_dict[frame_cnt] = []
-                            if flag_0sim1:
-                                if sed_pred2[frame_cnt][class_cnt]>0.5:
-                                    output_dict[frame_cnt].append([class_cnt, doa_pred2[frame_cnt][class_cnt], doa_pred2[frame_cnt][class_cnt+params['unique_classes']], doa_pred2[frame_cnt][class_cnt+2*params['unique_classes']]])
-                                doa_pred_fc = (doa_pred0[frame_cnt] + doa_pred1[frame_cnt]) / 2
-                                output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
-                            elif flag_1sim2:
+
+                if params['depth_coup_loss']:
+                    for frame_cnt in range(sed_pred0.shape[0]):
+                        for class_cnt in range(sed_pred0.shape[1]):
+                            # determine whether track0 is similar to track1
+                            flag_0sim1 = determine_similar_location(sed_pred0[frame_cnt][class_cnt], sed_pred1[frame_cnt][class_cnt], doa_pred0[frame_cnt], doa_pred1[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
+                            flag_1sim2 = determine_similar_location(sed_pred1[frame_cnt][class_cnt], sed_pred2[frame_cnt][class_cnt], doa_pred1[frame_cnt], doa_pred2[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
+                            flag_2sim0 = determine_similar_location(sed_pred2[frame_cnt][class_cnt], sed_pred0[frame_cnt][class_cnt], doa_pred2[frame_cnt], doa_pred0[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
+                            # unify or not unify according to flag
+                            if flag_0sim1 + flag_1sim2 + flag_2sim0 == 0:
                                 if sed_pred0[frame_cnt][class_cnt]>0.5:
-                                    output_dict[frame_cnt].append([class_cnt, doa_pred0[frame_cnt][class_cnt], doa_pred0[frame_cnt][class_cnt+params['unique_classes']], doa_pred0[frame_cnt][class_cnt+2*params['unique_classes']]])
-                                doa_pred_fc = (doa_pred1[frame_cnt] + doa_pred2[frame_cnt]) / 2
-                                output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
-                            elif flag_2sim0:
+                                    if frame_cnt not in output_dict:
+                                        output_dict[frame_cnt] = []
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred0[frame_cnt][class_cnt], doa_pred0[frame_cnt][class_cnt+params['unique_classes']], doa_pred0[frame_cnt][class_cnt+2*params['unique_classes']],depth0[frame_cnt][class_cnt]])
                                 if sed_pred1[frame_cnt][class_cnt]>0.5:
+                                    if frame_cnt not in output_dict:
+                                        output_dict[frame_cnt] = []
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred1[frame_cnt][class_cnt], doa_pred1[frame_cnt][class_cnt+params['unique_classes']], doa_pred1[frame_cnt][class_cnt+2*params['unique_classes']],depth1[frame_cnt][class_cnt]])
+                                if sed_pred2[frame_cnt][class_cnt]>0.5:
+                                    if frame_cnt not in output_dict:
+                                        output_dict[frame_cnt] = []
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred2[frame_cnt][class_cnt], doa_pred2[frame_cnt][class_cnt+params['unique_classes']], doa_pred2[frame_cnt][class_cnt+2*params['unique_classes']], depth2[frame_cnt][class_cnt]])
+                            elif flag_0sim1 + flag_1sim2 + flag_2sim0 == 1:
+                                if frame_cnt not in output_dict:
+                                    output_dict[frame_cnt] = []
+                                if flag_0sim1:
+                                    if sed_pred2[frame_cnt][class_cnt]>0.5:
+                                        output_dict[frame_cnt].append([class_cnt, doa_pred2[frame_cnt][class_cnt], doa_pred2[frame_cnt][class_cnt+params['unique_classes']], doa_pred2[frame_cnt][class_cnt+2*params['unique_classes']], depth2[frame_cnt][class_cnt]])
+                                    doa_pred_fc = (doa_pred0[frame_cnt] + doa_pred1[frame_cnt]) / 2
+                                    depth_fc = (depth0[frame_cnt][class_cnt] + depth1[frame_cnt][class_cnt]) / 2
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']], depth_fc])
+                                elif flag_1sim2:
+                                    if sed_pred0[frame_cnt][class_cnt]>0.5:
+                                        output_dict[frame_cnt].append([class_cnt, doa_pred0[frame_cnt][class_cnt], doa_pred0[frame_cnt][class_cnt+params['unique_classes']], doa_pred0[frame_cnt][class_cnt+2*params['unique_classes']], depth0[frame_cnt][class_cnt]])
+                                    doa_pred_fc = (doa_pred1[frame_cnt] + doa_pred2[frame_cnt]) / 2
+                                    depth_fc = (depth1[frame_cnt][class_cnt] + depth2[frame_cnt][class_cnt]) / 2
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']], depth_fc])
+                                elif flag_2sim0:
+                                    if sed_pred1[frame_cnt][class_cnt]>0.5:
+                                        output_dict[frame_cnt].append([class_cnt, doa_pred1[frame_cnt][class_cnt], doa_pred1[frame_cnt][class_cnt+params['unique_classes']], doa_pred1[frame_cnt][class_cnt+2*params['unique_classes']], depth1[frame_cnt][class_cnt]])
+                                    doa_pred_fc = (doa_pred2[frame_cnt] + doa_pred0[frame_cnt]) / 2
+                                    depth_fc = (depth2[frame_cnt][class_cnt] + depth0[frame_cnt][class_cnt]) / 2
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']], depth_fc])
+                            elif flag_0sim1 + flag_1sim2 + flag_2sim0 >= 2:
+                                if frame_cnt not in output_dict:
+                                    output_dict[frame_cnt] = []
+                                doa_pred_fc = (doa_pred0[frame_cnt] + doa_pred1[frame_cnt] + doa_pred2[frame_cnt]) / 3
+                                depth_fc = (depth0[frame_cnt][class_cnt] + depth1[frame_cnt][class_cnt] + depth2[frame_cnt][class_cnt]) / 3
+                                output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']], depth_fc])
+
+                else:
+                    for frame_cnt in range(sed_pred0.shape[0]):
+                        for class_cnt in range(sed_pred0.shape[1]):
+                            # determine whether track0 is similar to track1
+                            flag_0sim1 = determine_similar_location(sed_pred0[frame_cnt][class_cnt], sed_pred1[frame_cnt][class_cnt], doa_pred0[frame_cnt], doa_pred1[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
+                            flag_1sim2 = determine_similar_location(sed_pred1[frame_cnt][class_cnt], sed_pred2[frame_cnt][class_cnt], doa_pred1[frame_cnt], doa_pred2[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
+                            flag_2sim0 = determine_similar_location(sed_pred2[frame_cnt][class_cnt], sed_pred0[frame_cnt][class_cnt], doa_pred2[frame_cnt], doa_pred0[frame_cnt], class_cnt, params['thresh_unify'], params['unique_classes'])
+                            # unify or not unify according to flag
+                            if flag_0sim1 + flag_1sim2 + flag_2sim0 == 0:
+                                if sed_pred0[frame_cnt][class_cnt]>0.5:
+                                    if frame_cnt not in output_dict:
+                                        output_dict[frame_cnt] = []
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred0[frame_cnt][class_cnt], doa_pred0[frame_cnt][class_cnt+params['unique_classes']], doa_pred0[frame_cnt][class_cnt+2*params['unique_classes']]])
+                                if sed_pred1[frame_cnt][class_cnt]>0.5:
+                                    if frame_cnt not in output_dict:
+                                        output_dict[frame_cnt] = []
                                     output_dict[frame_cnt].append([class_cnt, doa_pred1[frame_cnt][class_cnt], doa_pred1[frame_cnt][class_cnt+params['unique_classes']], doa_pred1[frame_cnt][class_cnt+2*params['unique_classes']]])
-                                doa_pred_fc = (doa_pred2[frame_cnt] + doa_pred0[frame_cnt]) / 2
+                                if sed_pred2[frame_cnt][class_cnt]>0.5:
+                                    if frame_cnt not in output_dict:
+                                        output_dict[frame_cnt] = []
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred2[frame_cnt][class_cnt], doa_pred2[frame_cnt][class_cnt+params['unique_classes']], doa_pred2[frame_cnt][class_cnt+2*params['unique_classes']]])
+                            elif flag_0sim1 + flag_1sim2 + flag_2sim0 == 1:
+                                if frame_cnt not in output_dict:
+                                    output_dict[frame_cnt] = []
+                                if flag_0sim1:
+                                    if sed_pred2[frame_cnt][class_cnt]>0.5:
+                                        output_dict[frame_cnt].append([class_cnt, doa_pred2[frame_cnt][class_cnt], doa_pred2[frame_cnt][class_cnt+params['unique_classes']], doa_pred2[frame_cnt][class_cnt+2*params['unique_classes']]])
+                                    doa_pred_fc = (doa_pred0[frame_cnt] + doa_pred1[frame_cnt]) / 2
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
+                                elif flag_1sim2:
+                                    if sed_pred0[frame_cnt][class_cnt]>0.5:
+                                        output_dict[frame_cnt].append([class_cnt, doa_pred0[frame_cnt][class_cnt], doa_pred0[frame_cnt][class_cnt+params['unique_classes']], doa_pred0[frame_cnt][class_cnt+2*params['unique_classes']]])
+                                    doa_pred_fc = (doa_pred1[frame_cnt] + doa_pred2[frame_cnt]) / 2
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
+                                elif flag_2sim0:
+                                    if sed_pred1[frame_cnt][class_cnt]>0.5:
+                                        output_dict[frame_cnt].append([class_cnt, doa_pred1[frame_cnt][class_cnt], doa_pred1[frame_cnt][class_cnt+params['unique_classes']], doa_pred1[frame_cnt][class_cnt+2*params['unique_classes']]])
+                                    doa_pred_fc = (doa_pred2[frame_cnt] + doa_pred0[frame_cnt]) / 2
+                                    output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
+                            elif flag_0sim1 + flag_1sim2 + flag_2sim0 >= 2:
+                                if frame_cnt not in output_dict:
+                                    output_dict[frame_cnt] = []
+                                doa_pred_fc = (doa_pred0[frame_cnt] + doa_pred1[frame_cnt] + doa_pred2[frame_cnt]) / 3
                                 output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
-                        elif flag_0sim1 + flag_1sim2 + flag_2sim0 >= 2:
-                            if frame_cnt not in output_dict:
-                                output_dict[frame_cnt] = []
-                            doa_pred_fc = (doa_pred0[frame_cnt] + doa_pred1[frame_cnt] + doa_pred2[frame_cnt]) / 3
-                            output_dict[frame_cnt].append([class_cnt, doa_pred_fc[class_cnt], doa_pred_fc[class_cnt+params['unique_classes']], doa_pred_fc[class_cnt+2*params['unique_classes']]])
             else:
                 for frame_cnt in range(sed_pred.shape[0]):
                     for class_cnt in range(sed_pred.shape[1]):
