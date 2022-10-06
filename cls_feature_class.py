@@ -74,12 +74,12 @@ class FeatureClass:
             self._delta = 2 * np.pi * self._fs / (self._nfft * c)
             self._freq_vector = np.arange(self._nfft//2 + 1)
             self._freq_vector[0] = 1
-            self._freq_vector = self._freq_vector[None, :, None]  # 1 x n_bins x 1 
+            self._freq_vector = self._freq_vector[None, :, None]  # 1 x n_bins x 1
 
             # Initialize spectral feature constants
             self._cutoff_bin = np.int(np.floor(params['fmax_spectra_salsalite'] * self._nfft / np.float(self._fs)))
             assert self._upper_bin <= self._cutoff_bin, 'Upper bin for doa featurei {} is higher than cutoff bin for spectrogram {}!'.format()
-            self._nb_mel_bins = self._cutoff_bin-self._lower_bin 
+            self._nb_mel_bins = self._cutoff_bin-self._lower_bin
         else:
             self._nb_mel_bins = params['nb_mel_bins']
             self._mel_wts = librosa.filters.mel(sr=self._fs, n_fft=self._nfft, n_mels=self._nb_mel_bins).T
@@ -100,7 +100,7 @@ class FeatureClass:
             loc_aud_folder = os.path.join(self._aud_dir, sub_folder)
             for file_cnt, file_name in enumerate(os.listdir(loc_aud_folder)):
                 wav_filename = '{}.wav'.format(file_name.split('.')[0])
-                with contextlib.closing(wave.open(os.path.join(loc_aud_folder, wav_filename),'r')) as f: 
+                with contextlib.closing(wave.open(os.path.join(loc_aud_folder, wav_filename),'r')) as f:
                     audio_len = f.getnframes()
                 nb_feat_frames = int(audio_len / float(self._hop_len))
                 nb_label_frames = int(audio_len / float(self._label_hop_len))
@@ -141,7 +141,7 @@ class FeatureClass:
         W = linear_spectra[:, :, 0]
         I = np.real(np.conj(W)[:, :, np.newaxis] * linear_spectra[:, :, 1:])
         E = self._eps + (np.abs(W)**2 + ((np.abs(linear_spectra[:, :, 1:])**2).sum(-1))/3.0 )
-        
+
         I_norm = I/E[:, :, np.newaxis]
         I_norm_mel = np.transpose(np.dot(np.transpose(I_norm, (0,2,1)), self._mel_wts), (0,2,1))
         foa_iv = I_norm_mel.transpose((0, 2, 1)).reshape((linear_spectra.shape[0], self._nb_mel_bins * 3))
@@ -178,14 +178,14 @@ class FeatureClass:
             linear_spectra[:, :, ch_cnt] = librosa.power_to_db(linear_spectra[:, :, ch_cnt], ref=1.0, amin=1e-10, top_db=None)
         linear_spectra = linear_spectra[:, self._lower_bin:self._cutoff_bin, :]
         linear_spectra = linear_spectra.transpose((0, 2, 1)).reshape((linear_spectra.shape[0], -1))
-        
-        return np.concatenate((linear_spectra, phase_vector), axis=-1) 
+
+        return np.concatenate((linear_spectra, phase_vector), axis=-1)
 
 
 
     def _get_spectrogram_for_file(self, audio_filename):
         audio_in, fs = self._load_audio(audio_filename)
-         
+
         nb_feat_frames = int(len(audio_in) / float(self._hop_len))
         nb_label_frames = int(len(audio_in) / float(self._label_hop_len))
         self._filewise_frames[os.path.basename(audio_filename).split('.')[0]] = [nb_feat_frames, nb_label_frames]
@@ -451,6 +451,28 @@ class FeatureClass:
                 print('{}: {}, {}'.format(file_cnt, file_name, label_mat.shape))
                 np.save(os.path.join(self._label_dir, '{}.npy'.format(wav_filename.split('.')[0])), label_mat)
 
+    def extract_all_labels_depthC(self):
+        self.get_frame_stats()
+        self._label_dir = self.get_label_dir()
+
+        print('Extracting labels:')
+        print('\t\taud_dir {}\n\t\tdesc_dir {}\n\t\tlabel_dir {}'.format(
+            self._aud_dir, self._desc_dir, self._label_dir))
+        create_folder(self._label_dir)
+        for sub_folder in os.listdir(self._desc_dir):
+            loc_desc_folder = os.path.join(self._desc_dir, sub_folder)
+            for file_cnt, file_name in enumerate(os.listdir(loc_desc_folder)):
+                wav_filename = '{}.wav'.format(file_name.split('.')[0])
+                nb_label_frames = self._filewise_frames[file_name.split('.')[0]][1]
+                desc_file_polar = self.load_output_format_file_depthC(os.path.join(loc_desc_folder, file_name))
+                desc_file = self.convert_output_format_polar_to_cartesian_depthC(desc_file_polar)
+                if self._multi_accdoa:
+                    label_mat = self.get_adpit_labels_for_file(desc_file, nb_label_frames)
+                else:
+                    label_mat = self.get_labels_for_file(desc_file, nb_label_frames)
+                print('{}: {}, {}'.format(file_cnt, file_name, label_mat.shape))
+                np.save(os.path.join(self._label_dir, '{}.npy'.format(wav_filename.split('.')[0])), label_mat)
+
     # -------------------------------  DCASE OUTPUT  FORMAT FUNCTIONS -------------------------------
     def load_output_format_file(self, _output_format_file):
         """
@@ -467,10 +489,30 @@ class FeatureClass:
             _frame_ind = int(_words[0])
             if _frame_ind not in _output_dict:
                 _output_dict[_frame_ind] = []
-            if len(_words) == 5: #polar coordinates 
+            if len(_words) == 5: #polar coordinates
                 _output_dict[_frame_ind].append([int(_words[1]), int(_words[2]), float(_words[3]), float(_words[4])])
             elif len(_words) == 6: # cartesian coordinates
                 _output_dict[_frame_ind].append([int(_words[1]), int(_words[2]), float(_words[3]), float(_words[4]), float(_words[5])])
+        _fid.close()
+        return _output_dict
+
+    def load_output_format_file_depthC(self, _output_format_file):
+        """
+        Loads DCASE output format csv file and returns it in dictionary format
+
+        :param _output_format_file: DCASE output format CSV
+        :return: _output_dict: dictionary
+        """
+        _output_dict = {}
+        _fid = open(_output_format_file, 'r')
+        # next(_fid)
+        for _line in _fid:
+            _words = _line.strip().split(',')
+            _frame_ind = int(_words[0])
+            if _frame_ind not in _output_dict:
+                _output_dict[_frame_ind] = []
+            # there should be 6 values in the output format file
+            _output_dict[_frame_ind].append([int(_words[1]), int(_words[2]), float(_words[3]), float(_words[4]), float(_words[5])])
         _fid.close()
         return _output_dict
 
@@ -578,6 +620,24 @@ class FeatureClass:
                     x = np.cos(azi_rad) * tmp_label
                     y = np.sin(azi_rad) * tmp_label
                     z = np.sin(ele_rad)
+                    out_dict[frame_cnt].append([tmp_val[0], tmp_val[1], x, y, z])
+        return out_dict
+
+    def convert_output_format_polar_to_cartesian_depthC(self, in_dict):
+        out_dict = {}
+        for frame_cnt in in_dict.keys():
+            if frame_cnt not in out_dict:
+                out_dict[frame_cnt] = []
+                for tmp_val in in_dict[frame_cnt]:
+
+                    ele_rad = tmp_val[3]*np.pi/180.
+                    azi_rad = tmp_val[2]*np.pi/180
+                    radius = tmp_val[4]
+
+                    tmp_label = np.cos(ele_rad)
+                    x = radius * np.cos(azi_rad) * tmp_label
+                    y = radius * np.sin(azi_rad) * tmp_label
+                    z = radius * np.sin(ele_rad)
                     out_dict[frame_cnt].append([tmp_val[0], tmp_val[1], x, y, z])
         return out_dict
 

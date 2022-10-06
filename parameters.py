@@ -8,65 +8,68 @@ def get_params(argv='1'):
     print("SET: {}".format(argv))
     # ########### default parameters ##############
     params = dict(
-        quick_test=True,     # To do quick test. Trains/test on small subset of dataset, and # of epochs
-    
-        finetune_mode = False,  # Finetune on existing model, requires the pretrained model path set - pretrained_model_weights
-        pretrained_model_weights = 'models/1_1_foa_dev_split6_model.h5', 
+        quick_test=True,  # To do quick test. Trains/test on small subset of dataset, and # of epochs
+
+        finetune_mode=False,
+        # Finetune on existing model, requires the pretrained model path set - pretrained_model_weights
+        pretrained_model_weights='models/1_1_foa_dev_split6_model.h5',
 
         # INPUT PATH
         # dataset_dir='DCASE2020_SELD_dataset/',  # Base folder containing the foa/mic and metadata folders
-        dataset_dir = '/scratch/asignal/partha/DCASE2022_SELD_dataset',
+        dataset_dir='/scratch/asignal/partha/DCASE2022_SELD_dataset',
 
         # OUTPUT PATHS
         # feat_label_dir='DCASE2020_SELD_dataset/feat_label_hnet/',  # Directory to dump extracted features and labels
         feat_label_dir='/scratch/asignal/partha/DCASE2022_SELD_dataset/seld_feat_label',
- 
-        model_dir='models/',            # Dumps the trained models and training curves in this folder
-        dcase_output_dir='results/',    # recording-wise results are dumped in this path.
+
+        model_dir='models/',  # Dumps the trained models and training curves in this folder
+        dcase_output_dir='results/',  # recording-wise results are dumped in this path.
 
         # DATASET LOADING PARAMETERS
-        mode='dev',         # 'dev' - development or 'eval' - evaluation dataset
-        dataset='foa',       # 'foa' - ambisonic or 'mic' - microphone signals
+        mode='dev',  # 'dev' - development or 'eval' - evaluation dataset
+        dataset='foa',  # 'foa' - ambisonic or 'mic' - microphone signals
 
-        #FEATURE PARAMS
+        # FEATURE PARAMS
         fs=24000,
         hop_len_s=0.02,
         label_hop_len_s=0.1,
         max_audio_len_s=60,
         nb_mel_bins=64,
 
-        use_salsalite = False, # Used for MIC dataset only. If true use salsalite features, else use GCC features
-        fmin_doa_salsalite = 50,
-        fmax_doa_salsalite = 2000,
-        fmax_spectra_salsalite = 9000,
+        use_salsalite=False,  # Used for MIC dataset only. If true use salsalite features, else use GCC features
+        fmin_doa_salsalite=50,
+        fmax_doa_salsalite=2000,
+        fmax_spectra_salsalite=9000,
 
         # MODEL TYPE
         multi_accdoa=False,  # False - Single-ACCDOA or True - Multi-ACCDOA
-        thresh_unify=15,    # Required for Multi-ACCDOA only. Threshold of unification for inference in degrees.
+        thresh_unify=15,  # Required for Multi-ACCDOA only. Threshold of unification for inference in degrees.
 
         # DNN MODEL PARAMETERS
-        label_sequence_length=50,    # Feature sequence length
-        batch_size=128,              # Batch size
-        dropout_rate=0.05,             # Dropout rate, constant for all layers
-        nb_cnn2d_filt=64,           # Number of CNN nodes, constant for each layer
-        f_pool_size=[4, 4, 2],      # CNN frequency pooling, length of list = number of CNN layers, list value = pooling per layer
+        label_sequence_length=50,  # Feature sequence length
+        batch_size=128,  # Batch size
+        dropout_rate=0.05,  # Dropout rate, constant for all layers
+        nb_cnn2d_filt=64,  # Number of CNN nodes, constant for each layer
+        f_pool_size=[4, 4, 2],
+        # CNN frequency pooling, length of list = number of CNN layers, list value = pooling per layer
 
         nb_rnn_layers=2,
-        rnn_size=128,        # RNN contents, length of list = number of layers, list value = number of nodes
+        rnn_size=128,  # RNN contents, length of list = number of layers, list value = number of nodes
 
         self_attn=False,
         nb_heads=4,
 
         nb_fnn_layers=1,
-        fnn_size=128,             # FNN contents, length of list = number of layers, list value = number of nodes
+        fnn_size=128,  # FNN contents, length of list = number of layers, list value = number of nodes
 
-        nb_epochs=100,              # Train for maximum epochs
+        nb_epochs=100,  # Train for maximum epochs
         lr=1e-3,
 
         # METRIC
-        average = 'macro',        # Supports 'micro': sample-wise average and 'macro': class-wise average
+        average='macro',  # Supports 'micro': sample-wise average and 'macro': class-wise average
         lad_doa_thresh=20,
-        train_synth_test_synth = False,
+        train_synth_test_synth=False,
+        depth_coup_loss=False,
     )
 
     # ########### User defined parameters ##############
@@ -156,7 +159,8 @@ def get_params(argv='1'):
         params['use_salsalite'] = False
         params['multi_accdoa'] = True
         params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
-        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
+        params[
+            'feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
 
     elif argv == '13':
         print("MIC + GCC + synth_data generated + ignore distance + multi ACCDOA + \n")
@@ -174,7 +178,8 @@ def get_params(argv='1'):
         params['use_salsalite'] = False
         params['multi_accdoa'] = True
         params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
-        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
+        params[
+            'feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_comb_distFloat_oldLoss_2022'
 
     elif argv == '15':
         print("MIC + GCC + synth_data gen + multi ACCDOA\n")
@@ -196,6 +201,18 @@ def get_params(argv='1'):
         params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_gen_combData_itr1'
         params['train_synth_test_synth'] = True
 
+    elif argv == '17':
+        print("MIC + GCC + synth_data gen + multi ACCDOA\n")
+        params['quick_test'] = False
+        params['dataset'] = 'mic'
+        params['use_salsalite'] = False
+        params['multi_accdoa'] = True
+        params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
+        params[
+            'feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_genComb_distFloat_distLoss_2022_new'
+        params['train_synth_test_synth'] = True
+        params['depth_coup_loss'] = True
+
     elif argv == '999':
         print("QUICK TEST MODE\n")
         params['quick_test'] = True
@@ -206,11 +223,11 @@ def get_params(argv='1'):
 
     feature_label_resolution = int(params['label_hop_len_s'] // params['hop_len_s'])
     params['feature_sequence_length'] = params['label_sequence_length'] * feature_label_resolution
-    params['t_pool_size'] = [feature_label_resolution, 1, 1]     # CNN time pooling
-    params['patience'] = int(params['nb_epochs'])     # Stop training if patience is reached
+    params['t_pool_size'] = [feature_label_resolution, 1, 1]  # CNN time pooling
+    params['patience'] = int(params['nb_epochs'])  # Stop training if patience is reached
 
     if '2020' in params['dataset_dir']:
-        params['unique_classes'] = 14 
+        params['unique_classes'] = 14
     elif '2021' in params['dataset_dir']:
         params['unique_classes'] = 12
     elif '2022' in params['dataset_dir']:

@@ -23,7 +23,11 @@ def main(argv):
     dev_feat_cls.preprocess_features()
 
     # # Extract labels
-    dev_feat_cls.extract_all_labels()
+    if params['depth_coup_loss']:
+        dev_feat_cls.extract_all_labels_depthC()
+    else:
+        dev_feat_cls.extract_all_labels()
+
 
 if __name__ == "__main__":
     try:
