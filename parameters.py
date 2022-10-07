@@ -70,6 +70,7 @@ def get_params(argv='1'):
         lad_doa_thresh=20,
         train_synth_test_synth=False,
         depth_coup_loss=False,
+        read_all_dist_1=False,
     )
 
     # ########### User defined parameters ##############
@@ -206,9 +207,22 @@ def get_params(argv='1'):
         params['use_salsalite'] = False
         params['multi_accdoa'] = True
         params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
-        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_genComb_distFloat_distLoss_2022_new'
+        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_depthCouple'
         params['train_synth_test_synth'] = True
         params['depth_coup_loss'] = True
+
+    elif argv == '18':
+        print("MIC + GCC + synth_data gen + multi ACCDOA\n")
+        params['quick_test'] = False
+        params['dataset'] = 'mic'
+        params['use_salsalite'] = False
+        params['multi_accdoa'] = True
+        params['dataset_dir'] = '/scratch/sk8974/experiments/dsynth/data/input/gen_comb_distFloat_2022'
+        params['feat_label_dir'] = '/scratch/sk8974/experiments/dsynth/data/processed/feat_depthCouple_allDist_1'
+        params['train_synth_test_synth'] = True
+        params['depth_coup_loss'] = True
+        params['read_all_dist_1'] = True
+
 
     elif argv == '999':
         print("QUICK TEST MODE\n")

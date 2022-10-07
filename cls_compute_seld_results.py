@@ -108,7 +108,7 @@ class ComputeSELDResults(object):
         for pred_cnt, pred_file in enumerate(pred_files):
             # Load predicted output format file
             if self._feat_cls._depth_coup_loss:
-                pred_dict = self._feat_cls.load_output_format_file_ignoreDepth(os.path.join(pred_files_path, pred_file))
+                pred_dict = self._feat_cls.load_output_format_file_depthC_cart(os.path.join(pred_files_path, pred_file))
             else:
                 pred_dict = self._feat_cls.load_output_format_file(os.path.join(pred_files_path, pred_file))
             if self._use_polar_format:

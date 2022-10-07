@@ -259,7 +259,7 @@ def test_epoch(data_generator, model, criterion, dcase_output_folder, params, de
                             if frame_cnt not in output_dict:
                                 output_dict[frame_cnt] = []
                             output_dict[frame_cnt].append([class_cnt, doa_pred[frame_cnt][class_cnt], doa_pred[frame_cnt][class_cnt+params['unique_classes']], doa_pred[frame_cnt][class_cnt+2*params['unique_classes']]]) 
-            if params['']:
+            if params['depth_coup_loss']:
                 data_generator.write_output_format_file_depthC(output_file, output_dict)
             else:
                 data_generator.write_output_format_file(output_file, output_dict)
