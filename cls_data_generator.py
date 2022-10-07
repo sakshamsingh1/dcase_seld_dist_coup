@@ -290,5 +290,5 @@ class DataGenerator(object):
     def write_output_format_file(self, _out_file, _out_dict):
         return self._feat_cls.write_output_format_file(_out_file, _out_dict)
 
-    def write_output_format_file_depth(self, _out_file, _out_dict):
-        return self._feat_cls.write_output_format_file_depth(_out_file, _out_dict)
+    def write_output_format_file_depthC(self, _out_file, _out_dict):
+        return self._feat_cls.write_output_format_file_depthC(_out_file, _out_dict)
